@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coin Toss Bet Tracker 🎲</title>
+  <style>
+    body {
+      background: #121212;
+      color: #ffffff;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px 0;
+      width: 100%;
+      font-size: 1rem;
+    }
+    .btn {
+      background: #1f8ef1;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #0f6db8;
+    }
+    .stats, .log {
+      margin-top: 20px;
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    canvas {
+      margin-top: 20px;
+      background: #fff;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 Coin Toss Betting Game</h1>
+    <h2>Current Balance: ₹<span id="balance">1000</span></h2>
+
+    <input type="number" id="betAmount" placeholder="Enter bet amount (₹)" />
+    <button class="btn" onclick="placeBet()">Toss Coin</button>
+    <button class="btn" onclick="resetGame()">🔄 Reset Game</button>
+
+    <div class="stats">
+      <p>Total Bets: <span id="totalBets">0</span></p>
+      <p>Wins: <span id="wins">0</span>, Losses: <span id="losses">0</span></p>
+      <p>PnL: ₹<span id="pnl">0</span></p>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <canvas id="pnlChart" width="600" height="300"></canvas>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    let state = {
+      balance: 1000,
+      history: [],
+      wins: 0,
+      losses: 0
+    };
+
+    function loadState() {
+      const saved = localStorage.getItem("betTracker");
+      if (saved) state = JSON.parse(saved);
+    }
+
+    function saveState() {
+      localStorage.setItem("betTracker", JSON.stringify(state));
+    }
+
+    function updateUI() {
+      document.getElementById("balance").innerText = state.balance.toFixed(2);
+      document.getElementById("totalBets").innerText = state.history.length;
+      document.getElementById("wins").innerText = state.wins;
+      document.getElementById("losses").innerText = state.losses;
+      const pnl = state.balance - 1000;
+      document.getElementById("pnl").innerText = pnl.toFixed(2);
+      updateLog();
+      renderChart();
+    }
+
+    function placeBet() {
+      const bet = parseFloat(document.getElementById("betAmount").value);
+      if (isNaN(bet) || bet <= 0 || bet > state.balance) {
+        alert("Enter a valid bet amount within your balance.");
+        return;
+      }
+     	const array = new Uint8Array(1);
+	window.crypto.getRandomValues(array);
+	const win = array[0] < 128; // unbiased 50/50 toss
+
+      let result = {
+        bet,
+        win,
+        pnl: state.balance
+      };
+
+      if (win) {
+        state.balance += bet * 0.9;
+        state.wins++;
+      } else {
+        state.balance -= bet;
+        state.losses++;
+      }
+      result.pnl = state.balance;
+      state.history.push(result);
+      saveState();
+      updateUI();
+    }
+
+    function resetGame() {
+      if (!confirm("Are you sure you want to reset the game?")) return;
+      state = {
+        balance: 1000,
+        history: [],
+        wins: 0,
+        losses: 0
+      };
+      saveState();
+      updateUI();
+    }
+
+    function updateLog() {
+      const log = document.getElementById("log");
+      log.innerHTML = "<strong>Bet History:</strong><br>";
+      for (let i = state.history.length - 1; i >= 0; i--) {
+        const entry = state.history[i];
+        log.innerHTML += `Bet ₹${entry.bet.toFixed(2)} - ${entry.win ? '✅ Win' : '❌ Loss'} → Balance ₹${entry.pnl.toFixed(2)}<br>`;
+      }
+    }
+
+    let chart;
+    function renderChart() {
+      const ctx = document.getElementById("pnlChart").getContext("2d");
+      const labels = state.history.map((_, i) => i + 1);
+      const data = state.history.map(entry => entry.pnl);
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'PnL over Bets',
+            data: data,
+            borderColor: '#1f8ef1',
+            backgroundColor: 'rgba(31, 142, 241, 0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { labels: { color: 'white' } }
+          },
+          scales: {
+            x: { ticks: { color: 'white' } },
+            y: { ticks: { color: 'white' } }
+          }
+        }
+      });
+    }
+
+    loadState();
+    updateUI();
+  </script>
+</body>
+</html>
